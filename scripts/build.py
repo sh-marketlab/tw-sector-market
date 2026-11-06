@@ -6,6 +6,8 @@
      （權證歷史未滿 N 日前，以「現股成交量 > 20 日平均 + kσ」暫代，頁面會標示「替代」）
   3. 籌碼確認：集保 ≥1000 張大戶持股比例週增 ≥ chip_min_weekly_increase_pp 個百分點
   出場警示：跌破 MA20，或大戶比例連續 exit_big_holder_down_weeks 週下降
+  法人進駐：投信「剛開始」連買（inst_trust_buy_days～inst_trust_fresh_max_days 天）且 5 日買超 ≥ 5 日成交量 × inst_trust_5d_pct_of_volume，
+            或外資 5 日買超 ≥ 5 日成交量 × inst_foreign_5d_pct_of_volume
 """
 from __future__ import annotations
 
@@ -102,6 +104,7 @@ def price_metrics(df: pd.DataFrame, p: dict) -> dict:
         "below_ma20": bool(m20 and last < m20),
         "vol20": float(vol20.iloc[-1]) if not math.isnan(vol20.iloc[-1]) else None,
         "vol_pct": vol_pct, "vol_z": vol_z, "near_ma": near_ma, "quiet": quiet,
+        "avg_vol20": float(v.iloc[-20:].mean()) if len(v) >= 20 else None,
     }
 
 
@@ -136,10 +139,19 @@ def insti_metrics() -> tuple[dict[str, dict], int]:
     out = {}
     for code, g in df.sort_values("date").groupby("code"):
         t5 = g.tail(5)
-        tr = pd.to_numeric(t5["trust_net"], errors="coerce")
-        out[code] = {"foreign_5d_lots": round(float(t5["foreign_net"].sum()) / 1000),
-                     "trust_5d_lots": round(float(tr.sum()) / 1000) if tr.notna().any() else None,
-                     "insti_date": g["date"].iloc[-1]}
+        tr_all = pd.to_numeric(g["trust_net"], errors="coerce").fillna(0).tolist()
+        streak = 0
+        for x in reversed(tr_all):
+            if x > 0:
+                streak += 1
+            else:
+                break
+        tr5 = pd.to_numeric(t5["trust_net"], errors="coerce")
+        out[code] = {"foreign_5d_shares": float(t5["foreign_net"].sum()),
+                     "foreign_5d_lots": round(float(t5["foreign_net"].sum()) / 1000),
+                     "trust_5d_lots": round(float(tr5.sum()) / 1000) if tr5.notna().any() else None,
+                     "trust_5d_shares": float(tr5.sum()) if tr5.notna().any() else None,
+                     "trust_streak": streak, "insti_date": g["date"].iloc[-1]}
     return out, days
 
 
@@ -250,6 +262,26 @@ def build(prices: dict[str, pd.DataFrame] | None = None) -> dict:
                 r["lever_src"] = "現股量（替代）"
             bd = r.get("big_delta")
             r["chip"] = bd is not None and bd >= p["chip_min_weekly_increase_pp"]
+
+            # 法人進駐（比例都以「5 日成交量」= 20 日均量×5 為分母）：
+            #   投信：剛開始連買（N ~ fresh_max 天）且 5 日買超 ≥ 5 日成交量 × 比例 —— 過濾 ETF 長期小額被動買
+            #   外資：5 日買超 ≥ 5 日成交量 × 比例
+            av = r.get("avg_vol20")
+            vol5 = av * 5 if av else None
+            fs = r.get("foreign_5d_shares")
+            ts = r.get("trust_5d_shares")
+            r["foreign_5d_ratio"] = fs / vol5 if (vol5 and fs is not None) else None
+            r["trust_5d_ratio"] = ts / vol5 if (vol5 and ts is not None) else None
+            why = []
+            stk = r.get("trust_streak") or 0
+            if (p["inst_trust_buy_days"] <= stk <= p["inst_trust_fresh_max_days"]
+                    and (r["trust_5d_ratio"] or 0) >= p["inst_trust_5d_pct_of_volume"]):
+                why.append(f"投信連買{stk}天（5日買超={r['trust_5d_ratio'] * 100:.1f}%成交量）")
+            if r["foreign_5d_ratio"] is not None and r["foreign_5d_ratio"] >= p["inst_foreign_5d_pct_of_volume"]:
+                why.append(f"外資5日買超={r['foreign_5d_ratio'] * 100:.0f}%成交量")
+            r["inst"] = bool(why)
+            r["inst_why"] = "、".join(why)
+
             q = bool(r.get("quiet"))
             if q and r["lever"] and r["chip"]:
                 r["status"] = "完整訊號"
@@ -263,10 +295,14 @@ def build(prices: dict[str, pd.DataFrame] | None = None) -> dict:
                 r["status"] = "槓桿爆量"
             else:
                 r["status"] = ""
+            # 哪些要寄信：現股量替代的單純槓桿不寄（雜訊太多）
+            proxy_only = r["lever_src"] != "權證" and r["status"] in ("寧靜期＋槓桿", "槓桿爆量")
+            r["notify"] = [x for x in ([r["status"]] if r["status"] and not proxy_only else []) +
+                           (["法人進駐"] if r["inst"] else [])]
             # 出場警示：大戶連續下降一律標示；跌破 MA20 只對有訊號的標的標示（避免整頁都是警示）
             r["exit"] = r.get("big_down_weeks", 0) >= p["exit_big_holder_down_weeks"] or (
-                bool(r["status"]) and bool(r.get("below_ma20")))
-            if r["status"]:
+                bool(r["status"] or r["inst"]) and bool(r.get("below_ma20")))
+            if r["status"] or r["inst"]:
                 triggers.append({**r, "group": g["name"]})
             rows.append(r)
 
@@ -283,8 +319,8 @@ def build(prices: dict[str, pd.DataFrame] | None = None) -> dict:
         groups.append({"id": g["id"], "name": g["name"], "block": g["block"], "us_group": g.get("us_group"),
                        "anchor_chg5": a5, "signal_chg5": s5, "divergence": div, "stocks": rows})
 
-    rank = {"完整訊號": 0, "槓桿＋籌碼": 1, "寧靜期＋槓桿": 2, "籌碼集中": 3, "槓桿爆量": 4}
-    triggers.sort(key=lambda r: (rank[r["status"]], -(r.get("w_z") or r.get("vol_z") or 0)))
+    rank = {"完整訊號": 0, "槓桿＋籌碼": 1, "寧靜期＋槓桿": 2, "籌碼集中": 3, "": 4, "槓桿爆量": 5}
+    triggers.sort(key=lambda r: (rank[r["status"]] - (0.5 if r["inst"] else 0), -(r.get("w_z") or r.get("vol_z") or 0)))
     price_dates = [r.get("date") for g in groups for r in g["stocks"] if r.get("date")]
     fetch_log = json.loads((DATA / "fetch_log.json").read_text(encoding="utf-8")) if (DATA / "fetch_log.json").exists() else {}
     return clean({
@@ -295,7 +331,8 @@ def build(prices: dict[str, pd.DataFrame] | None = None) -> dict:
                    "warrant_need": p["warrant_lookback_days"] + 1,
                    "insti_days": i_days, "tdcc_weeks": t_weeks, "build_log": log, "fetch_log": fetch_log},
         "triggers": [{k: t.get(k) for k in ("code", "name", "group", "role", "status", "lever_src", "w_z",
-                                            "vol_z", "big_delta", "quiet", "exit", "close", "chg5")}
+                                            "vol_z", "big_delta", "quiet", "exit", "close", "chg5", "inst", "inst_why",
+                                            "notify", "trust_streak", "foreign_5d_ratio", "trust_5d_ratio")}
                      for t in triggers],
         "groups": groups,
     })
