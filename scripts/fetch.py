@@ -138,13 +138,21 @@ def _field_idx(fields: list[str], *must: str, exclude: tuple[str, ...] = ()) -> 
     return None
 
 
+# 櫃買中心新版表格欄位只寫「買進股數/賣出股數/買賣超股數」，法人別在上一層表頭，
+# 固定順序：代號,名稱, 外資(不含自營)[2-4], 外資自營商[5-7], 外資合計[8-10],
+# 投信[11-13], 自營商自行[14-16], 自營商避險[17-19], 自營商合計[20-22], 三大法人合計[23]
+TPEX_POS = {"code": 0, "foreign": 4, "trust": 13, "total": 23, "n": 24}
+
+
 def _parse_insti_table(fields, data, codes, d) -> list[dict]:
     ic = _field_idx(fields, "代號")
     ifo = _field_idx(fields, "外", "買賣超", exclude=("自營商-", "外資自營商買"))
     itr = _field_idx(fields, "投信", "買賣超")
     itot = _field_idx(fields, "三大法人", "買賣超")
+    if ifo is None and len(fields) == TPEX_POS["n"] and str(fields[TPEX_POS["foreign"]]).endswith("買賣超股數"):
+        ic, ifo, itr, itot = TPEX_POS["code"], TPEX_POS["foreign"], TPEX_POS["trust"], TPEX_POS["total"]
     if ic is None or ifo is None:
-        raise ValueError(f"找不到欄位：{fields}")
+        raise ValueError(f"找不到欄位：{fields[:6]}…（共 {len(fields)} 欄）")
     out = []
     for row in data:
         code = str(row[ic]).strip()
@@ -178,32 +186,49 @@ def _insti_tpex(d: dt.date, codes: set) -> list[dict]:
 
 
 def fetch_insti(log: dict, days: int = 5) -> None:
+    """依市場分別判斷缺哪幾天：上市或上櫃任一邊沒資料就只補那一邊。"""
+    import csv
+    import json as _json
+    from common import CONFIG
+
     codes = {s["code"] for s in watch_stocks()}
+    mm_path = CONFIG / "market_map.json"
+    mm = _json.loads(mm_path.read_text(encoding="utf-8")) if mm_path.exists() else {}
+    otc = {c for c in codes if mm.get(c) == ".TWO"}
+    listed = codes - otc
     path = DATA / "insti_daily.csv"
-    have = set()
+    have: dict[str, set] = {}
     if path.exists():
-        import csv
         with path.open(encoding="utf-8") as f:
-            have = {r["date"] for r in csv.DictReader(f)}
+            for r in csv.DictReader(f):
+                have.setdefault(r["date"], set()).add(r["code"])
     today = now_tpe().date()
-    rows, msgs = [], []
+    rows, msgs, errs = [], [], []
     for i in range(days):
         d = today - dt.timedelta(days=i)
-        if d.weekday() >= 5 or d.isoformat() in have:
+        if d.weekday() >= 5:
             continue
+        got_codes = have.get(d.isoformat(), set())
+        jobs = []
+        if not (got_codes & listed):
+            jobs.append(("TWSE", _insti_twse))
+        if otc and not (got_codes & otc):
+            jobs.append(("TPEx", _insti_tpex))
         got = []
-        for name, fn in (("TWSE", _insti_twse), ("TPEx", _insti_tpex)):
+        for name, fn in jobs:
             try:
                 got += fn(d, codes)
             except Exception as e:  # noqa: BLE001
-                msgs.append(f"{d} {name} error: {e}")
+                errs.append(f"{d} {name}: {str(e)[:120]}")
             time.sleep(3)  # 證交所有頻率限制
         if got:
             rows += got
-            msgs.append(f"{d}: {len(got)} 檔")
+            msgs.append(f"{d}+{len(got)}")
     if rows:
         upsert_csv(path, rows, ("date", "code"), ["date", "code", "foreign_net", "trust_net", "total_net"])
-    log["insti"] = "; ".join(msgs) or "no new trading days"
+    log["insti"] = (f"新增 {len(msgs)} 天：{', '.join(msgs[:5])}{'…' if len(msgs) > 5 else ''}" if msgs
+                    else "no new trading days")
+    log["insti_errors"] = errs[:5] + ([f"…另 {len(errs) - 5} 筆"] if len(errs) > 5 else [])
 
 
 # ---------------------------------------------------------------- 集保

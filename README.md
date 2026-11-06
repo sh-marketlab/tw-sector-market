@@ -10,6 +10,7 @@ config/watchlist.json   觀察名單（板塊、權值錨 / 訊號標的、對�
 config/params.json      訊號參數（可直接在 GitHub 網頁改）
 scripts/fetch.py        抓原始資料並累積到 data/（冪等，重跑不會重複）
 scripts/build.py        抓股價（yfinance）＋計算訊號 → docs/data.json
+scripts/notify.py       有新訊號 → 開 GitHub Issue（指派給 owner → email）
 docs/index.html         網頁
 .github/workflows/update.yml  平日台北 18:00、隔天 08:30 自動執行
 ```
@@ -26,3 +27,7 @@ docs/index.html         網頁
 1. Settings → Pages → Source 選 `Deploy from a branch`，Branch 選 `main` / `/docs`。
 2. Actions → update → Run workflow，`insti_days` 填 `90` 回補三大法人。
 3. 權證 z 分數需累積 21 個交易日、集保週變化需 2 週；未滿前頁面會標示並以現股量暫代。
+
+## Email 通知
+有**新出現**的訊號（完整訊號、槓桿＋籌碼、權證來源的槓桿、籌碼集中、法人進駐）時，Actions 會開一則 Issue 並指派給 repo owner，GitHub 會寄信。
+現股量替代的「槓桿爆量」只顯示不寄。收不到信請檢查 GitHub → Settings → Notifications → Email 是否勾選 Participating / Assigned。

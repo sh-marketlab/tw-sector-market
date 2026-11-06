@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: update
@@ -32,7 +33,13 @@ jobs:
       - name: Fetch
         run: python scripts/fetch.py all --days "${{ github.event.inputs.insti_days || '5' }}"
       - name: Build
-        run: python scripts/build.py
+        run: |
+          cp docs/data.json /tmp/prev_data.json 2>/dev/null || true
+          python scripts/build.py
+      - name: Notify (new signals → GitHub Issue → email)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/notify.py /tmp/prev_data.json docs/data.json
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
