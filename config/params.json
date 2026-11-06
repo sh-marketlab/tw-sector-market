@@ -1,0 +1,13 @@
+{
+  "_note": "訊號參數，可直接在 GitHub 網頁上改。",
+  "quiet_max_dist_to_ma": 0.08,
+  "quiet_max_vol_percentile": 0.40,
+  "warrant_lookback_days": 20,
+  "warrant_sigma": 2.0,
+  "warrant_min_amount_twd": 3000000,
+  "stock_volume_sigma": 2.0,
+  "chip_big_holder_level": "1000",
+  "chip_min_weekly_increase_pp": 1.0,
+  "exit_big_holder_down_weeks": 2,
+  "exit_below_ma": 20
+}

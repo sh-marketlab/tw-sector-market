@@ -1,0 +1,43 @@
+name: update
+
+on:
+  schedule:
+    - cron: "0 10 * * 1-5"    # 台北 18:00（收盤後：權證、法人、週五集保）
+    - cron: "30 0 * * 2-6"    # 台北隔天 08:30（補 OpenAPI 晚更新的資料）
+  workflow_dispatch:
+    inputs:
+      insti_days:
+        description: "三大法人回補的日曆日數（第一次可填 90）"
+        required: false
+        default: "5"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Fetch
+        run: python scripts/fetch.py all --days "${{ github.event.inputs.insti_days || '5' }}"
+      - name: Build
+        run: python scripts/build.py
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data docs config/market_map.json
+          git diff --cached --quiet || git commit -m "data: update $(TZ=Asia/Taipei date +%F_%H%M)"
+          git pull --rebase --autostash
+          git push

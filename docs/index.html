@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>台股籌碼板塊監測 · tw-sector-market</title>
+<style>
+  :root{
+    --bg:#f7f6f2; --card:#fff; --ink:#1d1d1b; --muted:#6b6a65; --line:#e4e2db;
+    --up:#c0392b; --down:#1e8449; --accent:#1f4e79; --warn:#b7791f; --sig:#6b2fa3;
+    --chip-bg:#f0eee7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+  header{padding:28px 24px 12px;max-width:1280px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px;letter-spacing:.02em}
+  .sub{color:var(--muted);font-size:13px}
+  main{max-width:1280px;margin:0 auto;padding:0 24px 48px}
+  .health{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 6px}
+  .pill{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:12px;color:var(--muted)}
+  .pill b{color:var(--ink);font-weight:600}
+  .pill.ok b{color:var(--down)} .pill.wait b{color:var(--warn)}
+  section{margin-top:26px}
+  h2{font-size:16px;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid var(--ink);display:flex;justify-content:space-between;align-items:baseline}
+  h2 small{font-weight:400;color:var(--muted);font-size:12px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .card .t{font-weight:600}
+  .card .g{color:var(--muted);font-size:12px}
+  .card .m{font-size:12px;margin-top:6px;color:var(--muted)}
+  .empty{color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:8px;padding:14px}
+  .group{background:var(--card);border:1px solid var(--line);border-radius:8px;margin-bottom:12px;overflow:hidden}
+  .ghead{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--chip-bg);gap:8px;flex-wrap:wrap}
+  .ghead .n{font-weight:600}
+  .ghead .meta{font-size:12px;color:var(--muted)}
+  .div{color:var(--warn);font-weight:600;font-size:12px}
+  .wrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+  th,td{padding:6px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+  th{font-size:11px;color:var(--muted);font-weight:500;background:#fbfaf7}
+  td.l,th.l{text-align:left}
+  tr:last-child td{border-bottom:none}
+  tr.anchor td{background:#fcfbf8}
+  .role{font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:4px}
+  .up{color:var(--up)} .down{color:var(--down)} .mut{color:var(--muted)}
+  .tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:4px;background:var(--chip-bg)}
+  .tag.full{background:var(--sig);color:#fff}
+  .tag.strong{background:#e8dcf3;color:var(--sig)}
+  .tag.mid{background:#fdf0dc;color:var(--warn)}
+  .tag.exit{background:#e7f3ec;color:var(--down)}
+  .y{color:var(--accent);font-weight:600}
+  .note{font-size:12px;color:var(--muted);margin-top:28px;line-height:1.7}
+  .note code{background:var(--chip-bg);padding:0 4px;border-radius:3px}
+  details summary{cursor:pointer;color:var(--muted);font-size:12px}
+  pre{font-size:11px;background:var(--card);border:1px solid var(--line);padding:10px;overflow:auto}
+</style>
+</head>
+<body>
+<header>
+  <h1>台股籌碼板塊監測</h1>
+  <div class="sub">槓桿先行（權證爆量）→ 籌碼集中（集保大戶）→ 價格｜板塊分組對應美股板塊週報</div>
+  <div class="health" id="health"></div>
+</header>
+<main>
+  <section>
+    <h2>本期觸發 <small>依強度排序：完整訊號 → 槓桿＋籌碼 → 寧靜期＋槓桿 → 籌碼集中 → 槓桿爆量</small></h2>
+    <div id="triggers"></div>
+  </section>
+  <div id="blocks"></div>
+  <div class="note" id="method"></div>
+</main>
+<script>
+const pct=(x,d=1)=>x==null?'<span class="mut">–</span>':`<span class="${x>0?'up':x<0?'down':''}">${x>0?'+':''}${(x*100).toFixed(d)}%</span>`;
+const num=(x,d=1)=>x==null?'<span class="mut">–</span>':(+x).toFixed(d);
+const lots=x=>x==null?'<span class="mut">–</span>':`<span class="${x>0?'up':x<0?'down':''}">${x>0?'+':''}${x.toLocaleString()}</span>`;
+const pp=x=>x==null?'<span class="mut">–</span>':`<span class="${x>0?'up':x<0?'down':''}">${x>0?'+':''}${x.toFixed(2)}</span>`;
+const yi=x=>x==null?'<span class="mut">–</span>':(x/1e6).toFixed(1);
+function tag(s){
+  if(!s) return '';
+  const c={'完整訊號':'full','槓桿＋籌碼':'strong','寧靜期＋槓桿':'mid','籌碼集中':'mid','槓桿爆量':''}[s]??'';
+  return `<span class="tag ${c}">${s}</span>`;
+}
+fetch('data.json?'+Date.now()).then(r=>r.json()).then(D=>{
+  const h=D.health;
+  const wcls=h.warrant_ready?'ok':'wait';
+  document.getElementById('health').innerHTML=[
+    `<span class="pill">股價日 <b>${D.price_date??'–'}</b></span>`,
+    `<span class="pill ${wcls}">權證歷史 <b>${h.warrant_days}/${h.warrant_need} 日</b>${h.warrant_ready?'':'（未滿前以現股量替代）'}</span>`,
+    `<span class="pill">三大法人 <b>${h.insti_days} 日</b></span>`,
+    `<span class="pill ${h.tdcc_weeks.length>=2?'ok':'wait'}">集保 <b>${h.tdcc_weeks.length} 週</b>${h.tdcc_weeks.length<2?'（滿 2 週才有週變化）':''}</span>`,
+    `<span class="pill">更新 <b>${D.generated_at.replace('T',' ').slice(0,16)}</b></span>`
+  ].join('');
+
+  const T=D.triggers;
+  document.getElementById('triggers').innerHTML=T.length?`<div class="cards">${T.map(t=>`
+    <div class="card"><div>${tag(t.status)} ${t.exit?'<span class="tag exit">出場警示</span>':''}</div>
+    <div class="t" style="margin-top:4px">${t.code} ${t.name}</div>
+    <div class="g">${t.group}${t.role==='anchor'?'・權值錨':''}</div>
+    <div class="m">槓桿 ${t.lever_src}：z ${num(t.w_z??t.vol_z)}｜大戶週變化 ${pp(t.big_delta)}｜寧靜期 ${t.quiet?'是':'否'}｜5日 ${pct(t.chg5)}</div></div>`).join('')}</div>`
+    :'<div class="empty">本期沒有觸發。</div>';
+
+  const blocks={};
+  D.groups.forEach(g=>(blocks[g.block]??=[]).push(g));
+  document.getElementById('blocks').innerHTML=Object.entries(blocks).map(([b,gs])=>`
+    <section><h2>${b}</h2>${gs.map(g=>`
+      <div class="group">
+        <div class="ghead"><span class="n">${g.name} <span class="meta">↔ 美股 ${g.us_group??''}</span></span>
+          <span class="meta">5日：權值 ${pct(g.anchor_chg5)}｜訊號標的 ${pct(g.signal_chg5)} ${g.divergence?`<span class="div">⚠ ${g.divergence}</span>`:''}</span></div>
+        <div class="wrap"><table>
+          <tr><th class="l">個股</th><th>收盤</th><th>1日</th><th>5日</th><th>20日</th><th>距MA200</th><th>距MA240</th>
+          <th>波動百分位</th><th>寧靜期</th><th>認購權證(百萬)</th><th>權證z</th><th>量z</th>
+          <th>外資5日(張)</th><th>投信5日(張)</th><th>大戶%</th><th>週變化(pp)</th><th>散戶人數</th><th class="l">狀態</th></tr>
+          ${g.stocks.map(s=>`<tr class="${s.role}">
+            <td class="l">${s.code} ${s.name}${s.role==='anchor'?'<span class="role">錨</span>':''}</td>
+            <td>${num(s.close,2)}</td><td>${pct(s.chg1)}</td><td>${pct(s.chg5)}</td><td>${pct(s.chg20)}</td>
+            <td>${pct(s.dist_ma200)}</td><td>${pct(s.dist_ma240)}</td>
+            <td>${s.vol_pct==null?'<span class="mut">–</span>':Math.round(s.vol_pct*100)}</td>
+            <td>${s.quiet?'<span class="y">●</span>':s.near_ma?'<span class="mut">近均線</span>':''}</td>
+            <td>${yi(s.w_call_amt)}</td><td>${num(s.w_z)}</td><td>${num(s.vol_z)}</td>
+            <td>${lots(s.foreign_5d_lots)}</td><td>${lots(s.trust_5d_lots)}</td>
+            <td>${s.big_pct==null?'<span class="mut">–</span>':s.big_pct.toFixed(2)}</td><td>${pp(s.big_delta)}</td>
+            <td>${pct(s.retail_people_chg)}</td>
+            <td class="l">${tag(s.status)} ${s.exit?'<span class="tag exit">出場警示</span>':''}</td></tr>`).join('')}
+        </table></div>
+      </div>`).join('')}</section>`).join('');
+
+  const P=D.params;
+  document.getElementById('method').innerHTML=`
+    <b>訊號定義</b>（參數在 <code>config/params.json</code>）<br>
+    ① 寧靜期：收盤距 MA200 或 MA240 在 ±${(P.quiet_max_dist_to_ma*100).toFixed(0)}% 內，且 20 日波動率在近一年 ${(P.quiet_max_vol_percentile*100).toFixed(0)} 百分位以下。<br>
+    ② 槓桿爆量：認購權證成交金額 &gt; 過去 ${P.warrant_lookback_days} 日平均 + ${P.warrant_sigma}σ（且 ≥ ${(P.warrant_min_amount_twd/1e6).toFixed(0)} 百萬）。權證歷史未滿前，以現股成交量 z ≥ ${P.stock_volume_sigma} 替代。<br>
+    ③ 籌碼集中：集保 ≥${P.chip_big_holder_level} 張大戶持股比例週增 ≥ ${P.chip_min_weekly_increase_pp} 個百分點。散戶人數＝≤50 張持有人數週變化。<br>
+    出場警示：跌破 MA${P.exit_below_ma}，或大戶比例連續 ${P.exit_big_holder_down_weeks} 週下降。<br>
+    注意：大戶包含外資保管帳戶與公司派，請搭配外資 5 日買賣超判讀；權證爆量也可能是避險，請搭配流動性儀表板的資金水位。此頁為研究工具，不是買賣建議。
+    <details style="margin-top:8px"><summary>資料抓取紀錄</summary><pre>${JSON.stringify({fetch:h.fetch_log,build:h.build_log},null,1)}</pre></details>`;
+});
+</script>
+</body>
+</html>
