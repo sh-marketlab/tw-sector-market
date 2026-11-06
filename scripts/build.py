@@ -7,7 +7,7 @@
   3. 籌碼確認：集保 ≥1000 張大戶持股比例週增 ≥ chip_min_weekly_increase_pp 個百分點
   出場警示：跌破 MA20，或大戶比例連續 exit_big_holder_down_weeks 週下降
   法人進駐：投信「剛開始」連買（inst_trust_buy_days～inst_trust_fresh_max_days 天）且 5 日買超 ≥ 5 日成交量 × inst_trust_5d_pct_of_volume，
-            或外資 5 日買超 ≥ 5 日成交量 × inst_foreign_5d_pct_of_volume
+            或外資連買 ≥ inst_foreign_buy_days 天且 5 日買超 ≥ 5 日成交量 × inst_foreign_5d_pct_of_volume
 """
 from __future__ import annotations
 
@@ -139,19 +139,21 @@ def insti_metrics() -> tuple[dict[str, dict], int]:
     out = {}
     for code, g in df.sort_values("date").groupby("code"):
         t5 = g.tail(5)
-        tr_all = pd.to_numeric(g["trust_net"], errors="coerce").fillna(0).tolist()
-        streak = 0
-        for x in reversed(tr_all):
-            if x > 0:
-                streak += 1
-            else:
-                break
+        def streak_of(col):
+            n = 0
+            for x in reversed(pd.to_numeric(g[col], errors="coerce").fillna(0).tolist()):
+                if x > 0:
+                    n += 1
+                else:
+                    break
+            return n
+        streak = streak_of("trust_net")
         tr5 = pd.to_numeric(t5["trust_net"], errors="coerce")
         out[code] = {"foreign_5d_shares": float(t5["foreign_net"].sum()),
                      "foreign_5d_lots": round(float(t5["foreign_net"].sum()) / 1000),
                      "trust_5d_lots": round(float(tr5.sum()) / 1000) if tr5.notna().any() else None,
                      "trust_5d_shares": float(tr5.sum()) if tr5.notna().any() else None,
-                     "trust_streak": streak, "insti_date": g["date"].iloc[-1]}
+                     "trust_streak": streak, "foreign_streak": streak_of("foreign_net"), "insti_date": g["date"].iloc[-1]}
     return out, days
 
 
@@ -265,7 +267,7 @@ def build(prices: dict[str, pd.DataFrame] | None = None) -> dict:
 
             # 法人進駐（比例都以「5 日成交量」= 20 日均量×5 為分母）：
             #   投信：剛開始連買（N ~ fresh_max 天）且 5 日買超 ≥ 5 日成交量 × 比例 —— 過濾 ETF 長期小額被動買
-            #   外資：5 日買超 ≥ 5 日成交量 × 比例
+            #   外資：連買 ≥ inst_foreign_buy_days 天，且 5 日買超 ≥ 5 日成交量 × 比例
             av = r.get("avg_vol20")
             vol5 = av * 5 if av else None
             fs = r.get("foreign_5d_shares")
@@ -277,8 +279,10 @@ def build(prices: dict[str, pd.DataFrame] | None = None) -> dict:
             if (p["inst_trust_buy_days"] <= stk <= p["inst_trust_fresh_max_days"]
                     and (r["trust_5d_ratio"] or 0) >= p["inst_trust_5d_pct_of_volume"]):
                 why.append(f"投信連買{stk}天（5日買超={r['trust_5d_ratio'] * 100:.1f}%成交量）")
-            if r["foreign_5d_ratio"] is not None and r["foreign_5d_ratio"] >= p["inst_foreign_5d_pct_of_volume"]:
-                why.append(f"外資5日買超={r['foreign_5d_ratio'] * 100:.0f}%成交量")
+            fstk = r.get("foreign_streak") or 0
+            if (r["foreign_5d_ratio"] is not None and r["foreign_5d_ratio"] >= p["inst_foreign_5d_pct_of_volume"]
+                    and fstk >= p["inst_foreign_buy_days"]):
+                why.append(f"外資連買{fstk}天（5日買超={r['foreign_5d_ratio'] * 100:.0f}%成交量）")
             r["inst"] = bool(why)
             r["inst_why"] = "、".join(why)
 
@@ -332,7 +336,7 @@ def build(prices: dict[str, pd.DataFrame] | None = None) -> dict:
                    "insti_days": i_days, "tdcc_weeks": t_weeks, "build_log": log, "fetch_log": fetch_log},
         "triggers": [{k: t.get(k) for k in ("code", "name", "group", "role", "status", "lever_src", "w_z",
                                             "vol_z", "big_delta", "quiet", "exit", "close", "chg5", "inst", "inst_why",
-                                            "notify", "trust_streak", "foreign_5d_ratio", "trust_5d_ratio")}
+                                            "notify", "trust_streak", "foreign_streak", "foreign_5d_ratio", "trust_5d_ratio")}
                      for t in triggers],
         "groups": groups,
     })

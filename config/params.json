@@ -14,5 +14,6 @@
   "_notify": "email 只寄：完整訊號、槓桿＋籌碼、權證來源的寧靜期＋槓桿/槓桿爆量、籌碼集中、法人進駐。現股量替代的槓桿爆量不寄。",
   "inst_trust_fresh_max_days": 5,
   "inst_trust_5d_pct_of_volume": 0.01,
-  "inst_foreign_5d_pct_of_volume": 0.1
+  "inst_foreign_5d_pct_of_volume": 0.1,
+  "inst_foreign_buy_days": 3
 }
