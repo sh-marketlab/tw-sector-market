@@ -110,7 +110,7 @@ fetch('data.json?'+Date.now()).then(r=>r.json()).then(D=>{
         <div class="wrap"><table>
           <tr><th class="l">個股</th><th>收盤</th><th>1日</th><th>5日</th><th>20日</th><th>距MA200</th><th>距MA240</th>
           <th>波動百分位</th><th>寧靜期</th><th>認購權證(百萬)</th><th>權證z</th><th>量z</th>
-          <th>外資5日(張)</th><th>外資5日/成交量</th><th>投信5日(張)</th><th>投信連買</th><th>大戶%</th><th>週變化(pp)</th><th>散戶人數</th><th class="l">狀態</th></tr>
+          <th>外資5日(張)</th><th>外資5日/成交量</th><th>外資連買</th><th>投信5日(張)</th><th>投信連買</th><th>大戶%</th><th>週變化(pp)</th><th>散戶人數</th><th class="l">狀態</th></tr>
           ${g.stocks.map(s=>`<tr class="${s.role}">
             <td class="l">${s.code} ${s.name}${s.role==='anchor'?'<span class="role">錨</span>':''}</td>
             <td>${num(s.close,2)}</td><td>${pct(s.chg1)}</td><td>${pct(s.chg5)}</td><td>${pct(s.chg20)}</td>
@@ -118,7 +118,7 @@ fetch('data.json?'+Date.now()).then(r=>r.json()).then(D=>{
             <td>${s.vol_pct==null?'<span class="mut">–</span>':Math.round(s.vol_pct*100)}</td>
             <td>${s.quiet?'<span class="y">●</span>':s.near_ma?'<span class="mut">近均線</span>':''}</td>
             <td>${yi(s.w_call_amt)}</td><td>${num(s.w_z)}</td><td>${num(s.vol_z)}</td>
-            <td>${lots(s.foreign_5d_lots)}</td><td>${pct(s.foreign_5d_ratio,0)}</td><td>${lots(s.trust_5d_lots)}</td><td>${s.trust_streak?s.trust_streak+'天':'<span class="mut">–</span>'}</td>
+            <td>${lots(s.foreign_5d_lots)}</td><td>${pct(s.foreign_5d_ratio,0)}</td><td>${s.foreign_streak?s.foreign_streak+'天':'<span class="mut">–</span>'}</td><td>${lots(s.trust_5d_lots)}</td><td>${s.trust_streak?s.trust_streak+'天':'<span class="mut">–</span>'}</td>
             <td>${s.big_pct==null?'<span class="mut">–</span>':s.big_pct.toFixed(2)}</td><td>${pp(s.big_delta)}</td>
             <td>${pct(s.retail_people_chg)}</td>
             <td class="l">${tag(s.status)} ${s.inst?'<span class="tag inst">法人進駐</span>':''} ${s.exit?'<span class="tag exit">出場警示</span>':''}</td></tr>`).join('')}
@@ -131,7 +131,7 @@ fetch('data.json?'+Date.now()).then(r=>r.json()).then(D=>{
     ① 寧靜期：收盤距 MA200 或 MA240 在 ±${(P.quiet_max_dist_to_ma*100).toFixed(0)}% 內，且 20 日波動率在近一年 ${(P.quiet_max_vol_percentile*100).toFixed(0)} 百分位以下。<br>
     ② 槓桿爆量：認購權證成交金額 &gt; 過去 ${P.warrant_lookback_days} 日平均 + ${P.warrant_sigma}σ（且 ≥ ${(P.warrant_min_amount_twd/1e6).toFixed(0)} 百萬）。權證歷史未滿前，以現股成交量 z ≥ ${P.stock_volume_sigma} 替代。<br>
     ③ 籌碼集中：集保 ≥${P.chip_big_holder_level} 張大戶持股比例週增 ≥ ${P.chip_min_weekly_increase_pp} 個百分點。散戶人數＝≤50 張持有人數週變化。<br>
-    ④ 法人進駐：投信<b>剛開始</b>連買（${P.inst_trust_buy_days}～${P.inst_trust_fresh_max_days} 天）且 5 日買超 ≥ 5 日成交量的 ${(P.inst_trust_5d_pct_of_volume*100).toFixed(0)}%（過濾 ETF 長期小額被動買），或外資 5 日買超 ≥ 5 日成交量的 ${(P.inst_foreign_5d_pct_of_volume*100).toFixed(0)}%。<br>
+    ④ 法人進駐：投信<b>剛開始</b>連買（${P.inst_trust_buy_days}～${P.inst_trust_fresh_max_days} 天）且 5 日買超 ≥ 5 日成交量的 ${(P.inst_trust_5d_pct_of_volume*100).toFixed(0)}%（過濾 ETF 長期小額被動買），或外資<b>連買 ≥ ${P.inst_foreign_buy_days} 天</b>且 5 日買超 ≥ 5 日成交量的 ${(P.inst_foreign_5d_pct_of_volume*100).toFixed(0)}%。<br>
     Email：有<b>新出現</b>的訊號才寄（GitHub Issue 通知）；以現股量替代的槓桿爆量只顯示、不寄。<br>
     出場警示：跌破 MA${P.exit_below_ma}，或大戶比例連續 ${P.exit_big_holder_down_weeks} 週下降。<br>
     注意：大戶包含外資保管帳戶與公司派，請搭配外資 5 日買賣超判讀；權證爆量也可能是避險，請搭配流動性儀表板的資金水位。此頁為研究工具，不是買賣建議。
