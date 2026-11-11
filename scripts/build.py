@@ -332,7 +332,8 @@ def build(prices: dict[str, pd.DataFrame] | None = None) -> dict:
                    "insti_days": i_days, "tdcc_weeks": t_weeks, "build_log": log, "fetch_log": fetch_log},
         "triggers": [{k: t.get(k) for k in ("code", "name", "group", "role", "status", "lever_src", "w_z",
                                             "vol_z", "big_delta", "quiet", "exit", "close", "chg5", "inst", "inst_why",
-                                            "notify", "trust_streak", "foreign_5d_ratio", "trust_5d_ratio")}
+                                            "notify", "trust_streak", "foreign_5d_ratio", "trust_5d_ratio",
+                                            "date", "insti_date")}
                      for t in triggers],
         "groups": groups,
     })

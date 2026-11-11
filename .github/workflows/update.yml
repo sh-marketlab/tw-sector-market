@@ -40,6 +40,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/notify.py /tmp/prev_data.json docs/data.json
+      - name: Backtest log (記錄新訊號、計算之後 5/10/20 日表現)
+        continue-on-error: true
+        run: python scripts/backtest.py /tmp/prev_data.json docs/data.json
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>訊號回測紀錄 · tw-sector-market</title>
+<style>
+  :root{
+    --bg:#f7f6f2; --card:#fff; --ink:#1d1d1b; --muted:#6b6a65; --line:#e4e2db;
+    --up:#c0392b; --down:#1e8449; --accent:#1f4e79; --warn:#b7791f; --sig:#6b2fa3; --chip-bg:#f0eee7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+  header{padding:28px 24px 12px;max-width:1280px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px}
+  .sub a{color:var(--accent)}
+  main{max-width:1280px;margin:0 auto;padding:0 24px 48px}
+  section{margin-top:24px}
+  h2{font-size:16px;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid var(--ink);display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+  h2 small{font-weight:400;color:var(--muted);font-size:12px}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.75}
+  .warn{border-color:#f0d9a8;background:#fffaf0}
+  .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:8px}
+  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+  th,td{padding:6px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+  th{font-size:11px;color:var(--muted);font-weight:500;background:#fbfaf7;position:sticky;top:0}
+  th.grp{text-align:center;border-left:1px solid var(--line)}
+  td.b{border-left:1px solid var(--line)}
+  td.l,th.l{text-align:left}
+  tr:last-child td{border-bottom:none}
+  tr.k-label td{font-weight:600}
+  tr.k-all td{font-weight:700;background:#fbfaf7}
+  tr.k-sub td:first-child,tr.k-cond td:first-child{padding-left:22px;color:var(--muted)}
+  .up{color:var(--up)} .down{color:var(--down)} .mut{color:var(--muted)}
+  .tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:4px;background:var(--chip-bg)}
+  .tag.inst{background:#dbe9f6;color:var(--accent)}
+  .tag.full{background:var(--sig);color:#fff}
+  .tag.src{background:#f3f1ea;color:var(--muted)}
+  .small{font-size:11px;color:var(--muted)}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .filters button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:3px 12px;font-size:12px;cursor:pointer;color:var(--muted)}
+  .filters button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .empty{color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:8px;padding:14px}
+</style>
+</head>
+<body>
+<header>
+  <h1>訊號回測紀錄</h1>
+  <div class="sub">每次出現新訊號就記一筆，追蹤進場後 5 / 10 / 20 個交易日的表現｜<a href="./">← 回到監測頁</a></div>
+</header>
+<main>
+  <section>
+    <div class="box" id="how"></div>
+  </section>
+  <section>
+    <h2>各訊號表現 <small id="gen"></small></h2>
+    <div id="summary"></div>
+  </section>
+  <section>
+    <h2>每筆紀錄 <small>最新在上｜灰色＝還沒走完 20 個交易日</small></h2>
+    <div class="filters" id="filters"></div>
+    <div id="events"></div>
+  </section>
+</main>
+<script>
+const pct=(x,d=1)=>x==null?'<span class="mut">–</span>':`<span class="${x>0?'up':x<0?'down':''}">${x>0?'+':''}${(x*100).toFixed(d)}%</span>`;
+const rate=(x,n)=>x==null?'<span class="mut">–</span>':`${Math.round(x*100)}%<span class="small"> /${n}</span>`;
+const H=[5,10,20];
+function tag(l){
+  const c={'法人進駐':'inst','完整訊號':'full'}[l]??'';
+  return `<span class="tag ${c}">${l}</span>`;
+}
+fetch('backtest.json?'+Date.now()).then(r=>{if(!r.ok)throw 0;return r.json()}).then(D=>{
+  const M=D.method;
+  document.getElementById('gen').textContent=`更新 ${D.generated_at.replace('T',' ').slice(0,16)}｜共 ${D.events.length} 筆`;
+  document.getElementById('how').innerHTML=`
+    <b>怎麼算</b>：收到訊號後，假設在<b>${M.entry}</b>買進（email 傍晚才寄，訊號日收盤其實買不到），看之後 ${M.horizons.join(' / ')} 個交易日的漲跌，並和同期${M.bench}比較。<br>
+    <b>上漲比例</b>＝有幾成訊號之後股價是漲的；<b>贏大盤比例</b>＝有幾成漲得比加權指數多（或跌得比較少）。贏大盤比例明顯高於 50%，才代表訊號真的有用，而不只是大盤剛好在漲。<br>
+    <b>回推</b>＝啟用回測前，用過去的三大法人資料重算出來的「法人進駐」；<b>即時</b>＝之後每天實際出現的訊號。同一檔同一種訊號 ${M.cooldown_days} 個交易日內重複出現只算第一次。<br>
+    <span class="small">⚠ 樣本少於 30 筆時，結果很容易被一兩檔大漲大跌左右，先當參考。訊號重疊在同一段行情時（例如同一週很多檔一起觸發），樣本之間不獨立，實際可信度比筆數看起來更低。${D.notes&&D.notes.length?'<br>本次執行：'+D.notes.join('；'):''}</span>`;
+
+  const S=D.summary;
+  document.getElementById('summary').innerHTML=S.length?`<div class="wrap"><table>
+    <tr><th class="l" rowspan="2">訊號</th><th rowspan="2">筆數</th>
+      ${H.map(h=>`<th class="grp" colspan="4">${h} 日後</th>`).join('')}<th class="grp" rowspan="2">20日內<br>平均最大跌幅</th></tr>
+    <tr>${H.map(()=>`<th>平均報酬</th><th>上漲比例</th><th>平均超額</th><th>贏大盤</th>`).join('')}</tr>
+    ${S.map(s=>`<tr class="k-${s.kind}"><td class="l">${s.name}${s.n<30?' <span class="small">樣本少</span>':''}</td><td>${s.n}</td>
+      ${H.map(h=>`<td class="b">${pct(s['mean'+h],2)}</td><td>${rate(s['up'+h],s['n'+h])}</td><td>${pct(s['xmean'+h],2)}</td><td>${rate(s['beat'+h],s['n'+h])}</td>`).join('')}
+      <td class="b">${pct(s.mdd_mean)}</td></tr>`).join('')}
+  </table></div><div class="small" style="margin-top:6px">「/數字」＝已走完該天數、能計算的筆數。</div>`
+  :`<div class="empty">${D.has_prices?'還沒有任何訊號紀錄。':'這次抓不到股價，下次更新會補上。'}</div>`;
+
+  const E=D.events;
+  const labels=['全部',...new Set(E.map(e=>e.label))];
+  let cur='全部';
+  const draw=()=>{
+    document.getElementById('filters').innerHTML=labels.map(l=>`<button class="${l===cur?'on':''}" data-l="${l}">${l}</button>`).join('');
+    document.querySelectorAll('#filters button').forEach(b=>b.onclick=()=>{cur=b.dataset.l;draw()});
+    const rows=E.filter(e=>cur==='全部'||e.label===cur);
+    document.getElementById('events').innerHTML=rows.length?`<div class="wrap"><table>
+      <tr><th class="l">訊號日</th><th class="l">個股</th><th class="l">板塊</th><th class="l">訊號</th><th class="l">依據</th>
+        <th>進場日</th><th>進場價</th>${H.map(h=>`<th class="grp">${h}日報酬</th><th>超額</th>`).join('')}<th class="grp">最大跌幅</th><th class="l">狀態</th></tr>
+      ${rows.map(e=>`<tr style="${e.state==='完成'?'':'color:var(--muted)'}">
+        <td class="l">${e.signal_date}</td><td class="l">${e.code} ${e.name}</td><td class="l">${e.group??''}</td>
+        <td class="l">${tag(e.label)} <span class="tag src">${e.source}</span>${e.notified?' ✉':''}</td>
+        <td class="l small">${e.sub&&e.label!=='法人進駐'?e.sub+'｜':''}${e.detail??''}${e.quiet?'｜寧靜期':''}</td>
+        <td>${e.entry_date??'–'}</td><td>${e.entry_close??'–'}</td>
+        ${H.map(h=>`<td class="b">${pct(e['r'+h])}</td><td>${pct(e['x'+h])}</td>`).join('')}
+        <td class="b">${pct(e.mdd)}</td><td class="l small">${e.state}</td></tr>`).join('')}
+    </table></div>`:'<div class="empty">沒有紀錄。</div>';
+  };
+  draw();
+}).catch(()=>{
+  document.getElementById('how').innerHTML='回測資料還沒產生，下次自動更新（平日台北 18:00）後就會出現。';
+});
+</script>
+</body>
+</html>
