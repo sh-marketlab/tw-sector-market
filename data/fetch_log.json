@@ -1,10 +1,10 @@
 {
-  "last_run": "2026-11-11T14:58+08:00",
+  "last_run": "2026-11-12T01:49+08:00",
   "warrant_master_TWSE": "ok: 45984 檔權證，12133 檔對應到觀察名單",
-  "warrant_master_TPEx": "ok: 17932 檔權證，1138 檔對應到觀察名單",
+  "warrant_master_TPEx": "ok: 18050 檔權證，1165 檔對應到觀察名單",
   "warrant_trade_TWSE": "ok: 交易日 ['2026-11-10']，10725 筆對應",
-  "warrant_trade_TPEx": "ok: 交易日 ['2026-11-10']，730 筆對應",
-  "insti": "新增 1 天：2026-11-11+8",
+  "warrant_trade_TPEx": "ok: 交易日 ['2026-11-11']，732 筆對應",
+  "insti": "新增 1 天：2026-11-11+58",
   "tdcc": "2026-11-06 已存在，略過",
   "insti_errors": []
 }
