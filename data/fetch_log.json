@@ -1,10 +1,10 @@
 {
-  "last_run": "2026-11-13T02:04+08:00",
-  "warrant_master_TWSE": "ok: 46313 檔權證，12239 檔對應到觀察名單",
+  "last_run": "2026-11-13T15:06+08:00",
+  "warrant_master_TWSE": "ok: 46662 檔權證，12368 檔對應到觀察名單",
   "warrant_master_TPEx": "ok: 18132 檔權證，1166 檔對應到觀察名單",
-  "warrant_trade_TWSE": "ok: 交易日 ['2026-11-11']，10791 筆對應",
+  "warrant_trade_TWSE": "ok: 交易日 ['2026-11-12']，10891 筆對應",
   "warrant_trade_TPEx": "ok: 交易日 ['2026-11-12']，734 筆對應",
-  "insti": "新增 1 天：2026-11-12+66",
+  "insti": "新增 1 天：2026-11-13+8",
   "tdcc": "error: GET failed: https://smart.tdcc.com.tw/opendata/getOD.ashx?id=1-5 (HTTPSConnectionPool(host='smart.tdcc.com.tw', port=443): Max retries exceeded with url: /opendata/getOD.ashx?id=1-5 (Caused by NewConnectionError(\"HTTPSConnection(host='smart.tdcc.com.tw', port=443): Failed to establish a new connection: [Errno 101] Network is unreachable\")))",
   "insti_errors": []
 }
