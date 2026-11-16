@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-14T15:07+08:00",
+ "generated_at": "2026-11-17T04:22+08:00",
  "method": {
   "entry": "訊號日的次一交易日收盤",
   "horizons": [
@@ -11,7 +11,7 @@
   "cooldown_days": 10
  },
  "notes": [
-  "即時新增 0 筆"
+  "即時新增 2 筆"
  ],
  "has_prices": true,
  "has_bench": true,
@@ -19,7 +19,7 @@
   {
    "name": "全部訊號",
    "kind": "all",
-   "n": 219,
+   "n": 221,
    "n5": 189,
    "mean5": -0.0022076157942381345,
    "median5": 0.0,
@@ -91,7 +91,7 @@
   {
    "name": "法人進駐",
    "kind": "label",
-   "n": 203,
+   "n": 205,
    "n5": 189,
    "mean5": -0.0022076157942381345,
    "median5": 0.0,
@@ -163,7 +163,7 @@
   {
    "name": "法人進駐｜外資",
    "kind": "sub",
-   "n": 132,
+   "n": 134,
    "n5": 125,
    "mean5": -0.00018382450652825,
    "median5": 0.0025509899768116906,
@@ -211,7 +211,7 @@
   {
    "name": "法人進駐｜即時",
    "kind": "sub",
-   "n": 10,
+   "n": 12,
    "n5": 0,
    "mean5": null,
    "median5": null,
@@ -282,6 +282,32 @@
   }
  ],
  "events": [
+  {
+   "signal_date": "2026-11-16",
+   "code": "6669",
+   "name": "緯穎",
+   "group": "AI 伺服器 / ODM",
+   "label": "法人進駐",
+   "sub": "外資",
+   "quiet": false,
+   "notified": true,
+   "source": "即時",
+   "detail": "外資5日買超=16%成交量",
+   "state": "等待進場"
+  },
+  {
+   "signal_date": "2026-11-16",
+   "code": "3491",
+   "name": "昇達科",
+   "group": "低軌衛星",
+   "label": "法人進駐",
+   "sub": "外資",
+   "quiet": false,
+   "notified": true,
+   "source": "即時",
+   "detail": "外資5日買超=13%成交量",
+   "state": "等待進場"
+  },
   {
    "signal_date": "2026-11-13",
    "code": "5880",
