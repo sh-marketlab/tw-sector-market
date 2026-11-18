@@ -1,10 +1,10 @@
 {
-  "last_run": "2026-11-18T15:51+08:00",
+  "last_run": "2026-11-19T02:45+08:00",
   "warrant_master_TWSE": "ok: 47592 檔權證，12741 檔對應到觀察名單",
-  "warrant_master_TPEx": "ok: 18406 檔權證，1217 檔對應到觀察名單",
+  "warrant_master_TPEx": "ok: 18468 檔權證，1221 檔對應到觀察名單",
   "warrant_trade_TWSE": "ok: 交易日 ['2026-11-17']，11122 筆對應",
-  "warrant_trade_TPEx": "error: GET failed: https://mopsfin.twse.com.tw/opendata/t187ap42_O.csv (('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer')))",
-  "insti": "新增 1 天：2026-11-18+8",
+  "warrant_trade_TPEx": "ok: 交易日 ['2026-11-18']，785 筆對應",
+  "insti": "新增 1 天：2026-11-18+58",
   "tdcc": "error: GET failed: https://smart.tdcc.com.tw/opendata/getOD.ashx?id=1-5 (HTTPSConnectionPool(host='smart.tdcc.com.tw', port=443): Max retries exceeded with url: /opendata/getOD.ashx?id=1-5 (Caused by NewConnectionError(\"HTTPSConnection(host='smart.tdcc.com.tw', port=443): Failed to establish a new connection: [Errno 101] Network is unreachable\")))",
   "insti_errors": []
 }
